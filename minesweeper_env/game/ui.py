@@ -22,8 +22,8 @@ class MinesweeperUI(Minesweeper):
             if i.type == pg.MOUSEBUTTONDOWN:
                 x, y = pg.mouse.get_pos()
                 action = self.get_action(i.button, y, x)
-                # print(action)
                 self.play_action(action)
+                self.human_render()
             if i.type == pg.KEYDOWN:
                 if i.key == pg.K_r:
                     self.reset_game()

@@ -1,129 +1,109 @@
 import gym
-import gym.spaces
+from gym import spaces
 import pygame
 from minesweeper_env.game.minesweeper_game import Minesweeper
 import numpy as np
+import os
+from minesweeper_env.preferences import MinesweeperEnvPreferences
+from dataclasses import asdict
 
 class MinesweeperEnv(Minesweeper, gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
-    def __init__(self, field_size: tuple[int, int], mines_num: int, use_render: bool, seed: int | None = None, render_mode: str = 'human', max_steps: int = 200) -> None:
+    metadata = {"render_modes": ["human", "info", "none"]}
+    def __init__(self,
+                 field_size: tuple[int, int],
+                 mines_num: int,
+                 use_render: bool,
+                 seed: int | None = None,
+                 render_mode: str = 'human',
+                 env_max_steps: int = 200,
+                 **kwargs) -> None:
+        use_render = use_render and render_mode == 'human'
         super().__init__(field_size, mines_num, use_render, seed)
-        self.window_size = 512
-        self.action_space = gym.spaces.Discrete(field_size[0] * field_size[1] * 2)
-        self.observation_space = gym.spaces.Box(-3., 8., (1, *field_size))
+        self.action_space = spaces.Discrete(self.field_size[0] * self.field_size[1])
+        self.observation_space = spaces.Box(-4., 8, (1, *self.field_size))
+        self.actions = self.get_actions()
+        self.env_max_steps = env_max_steps
         self.render_mode = render_mode
-        self.window = None
-        self.actions = self._get_actions()
-        self.lmc_actions = self._get_lmc_actions()
-        self.lmc_actions_indices = [i for i in range(len(self.actions)) if i % 2 == 1]
-        self.max_steps = max_steps
-        self.render_mode = 'rgb_array'
-        self.placed_flags = set()
-
-        # self.step_ind = 1
-        # self.reward = 0.
-        # self.previous_player_field = None
-        # self.previous_opened_field = None
-
-    def _get_actions(self) -> list[list[int, int, int]]:
-        actions = []
-        for y in range(self.field_size[0]):
-            for x in range(self.field_size[1]):
-                actions.extend([[0, y, x], [1, y, x]])
-        return actions
-
-    def _get_lmc_actions(self) -> list[list[int, int, int]]:
-        return [self.actions[i] for i in range(0,len(self.actions)) if i % 2 == 0]
-
-    def reset(self, seed = None, options = None):
-        self.previous_player_field = None
-        self.previous_opened_field = None
-        self.previous_action = None
-        self.previous_good_flags = None
-        self.reward = 0
-        self.step_ind = 0
-        self.reset_game()
-        obs = np.asarray([self.opened_field])
-        return obs, {}
 
     def step(self, action):
         self.previous_opened_field = np.copy(self.opened_field)
         self.previous_player_field = np.copy(self.player_field)
         self.previous_good_flags = self.placed_good_flags.copy()
         action = self.actions[action]
-        self.step_ind += 1
-        # print(action)
-        self.previous_action = np.copy(action)
         self.play_action(action)
-        obs = np.asarray([self.opened_field]) # add 1 to shape | (*field_size) ==> (1, *field_size)
-        self._calculate_reward()
-        return obs, self.reward, self.game_lost or self.game_won, self.step_ind > self.max_steps, {}
-
-    def _calculate_reward(self):
-        if self.game_lost:
-            self.reward -= 20.
-            return
-        elif self.game_won:
-            self.reward += 100.
-            return
-        if self.previous_action is not None:
-            # If rightclick
-            if self.previous_action[0] == 0.:
-                # If good flag removed
-                if len(self.placed_good_flags) < len(self.previous_good_flags):
-                    self.reward -= 2.2
-                # If rightclick was useless
-                elif len(self.placed_good_flags) == len(self.previous_good_flags):
-                    self.reward -= 0.2    
-                # If good flag placed
-                else:
-                    self.reward += 2.
-
-
-
-            elif self.previous_action[0] == 1.:
-                # print('here')
-                if self.previous_opened_field is not None:
-                    # If clicked on opened cell
-                    if (self.opened_field == self.previous_opened_field).all():
-                        self.reward -= 0.01
-                    # If clicked on closed cell and it wasnt mine
-                    elif self.last_opened_cell_value != -3.:
-                        self.reward += 0.5
-                        # Bonus reward if clicked cell has opened neighbours
-                        for nei in self.scanner.get_neighbours(self.last_opened_coords, self.field_size):
-                            if self.opened_field[nei] >= 0.:
-                                self.reward += 0.1
-
+        # obs = np.asarray([self.opened_field])
+        obs = self.opened_field
+        print(self.observation_space.shape)
+        self.get_reward()
+        self.render()
+        self.step_ind += 1
+        return obs, self.reward - self.last_reward, self.game_lost or self.game_won, self.step_ind > self.env_max_steps, {'score': self.reward}
+    
+    def reset(self, seed = None, options = None):
+        self.previous_opened_field = None
+        self.previous_player_field = None
+        self.reward = 0
+        self.last_reward = 0
+        self.step_ind = 0
+        self.reset_game()
+        # obs = np.asarray([self.opened_field])
+        # return obs, {}
+        return self.opened_field, {}
+    
     def render(self):
-        if self.render_mode == 'rgb_array':
-            pass
-        elif self.render_mode == 'human':
+        if self.render_mode == 'human':
+            self.utility_data[0]['Points'] = self.reward
+            self.utility_data[0]['Steps'] = f'{self.step_ind} / {self.env_max_steps}'
+            self.utility_data[0]['Game won'] = self.game_won
+            self.utility_data[0]['Game lost'] = self.game_lost
             self.human_render()
-
+        elif self.render_mode == 'info':
+            os.system('clear')
+            print(f'Steps: {self.step_ind} / {self.env_max_steps}')
+            print(f'Score: {self.reward}')
+            print(f'Game won: {self.game_won}')
+            print(f'Game lost: {self.game_lost}')
+        elif self.render_mode == 'none':
+            pass
 
     def close(self):
-        if self.window is not None:
+        if self.renderer is not None:
             pygame.display.quit()
             pygame.quit()
-    
 
+    def get_reward(self):
+        self.last_reward = self.reward
+        if self.game_lost:
+            self.reward -= 5.
+            return
+        elif self.game_won:
+            self.reward += 10.
+            return
+        if self.previous_opened_field is not None:
+            # If clicked on opened cell
+            if (self.opened_field == self.previous_opened_field).all():
+                self.reward -= 0.1
+            # If clicked on closed cell and it wasnt mine
+            elif self.last_opened_cell_value != -3.:
+                self.reward += 0.5
+                # Bonus reward if clicked cell has opened neighbours
+                for nei in self.scanner.get_neighbours(self.last_opened_coords, self.field_size):
+                    if self.opened_field[nei] >= 0.:
+                        self.reward += 0.1
+
+    def get_actions(self):
+        actions = []
+        for y in range(self.field_size[0]):
+            for x in range(self.field_size[1]):
+                actions.append((1, y, x,))
+        return actions
+    
 gym.register(id='MinesweeperEnv-v1',
              entry_point='minesweeper_env.minenv:MinesweeperEnv',
              max_episode_steps=300)
 
-def get_minenv(field_size: int,
-               mines_num: int,
-               use_render: bool,
-               seed: int | None = None,
-               render_mode = 'human',
-               max_steps = 200) -> MinesweeperEnv:
+def get_minenv(preferences: MinesweeperEnvPreferences) -> MinesweeperEnv:
     return gym.make('MinesweeperEnv-v1',
-                    field_size = field_size,
-                    mines_num = mines_num,
-                    use_render = use_render,
-                    seed = seed,
-                    render_mode = render_mode,
-                    max_steps = max_steps)
+                    **asdict(preferences))
 
 

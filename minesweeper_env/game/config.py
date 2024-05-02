@@ -5,8 +5,8 @@ field_size = (10, 10)
 mines_num = 3
 use_render = True
 seed = 8128376198273
-# render_mode = 'human'
-render_mode = 'rgb_array'
+render_mode = 'human'
+render_modes = ('info', 'human', 'none')
 max_steps = field_size[0] * field_size[1] // 2
 env_kwargs = {'field_size': field_size,
               'mines_num': mines_num,
@@ -17,7 +17,7 @@ env_kwargs = {'field_size': field_size,
 
 
 model_filename = 'dqn.pt'
-
+env_max_steps = 200
 
 # TRAINING PREFERENCES
 

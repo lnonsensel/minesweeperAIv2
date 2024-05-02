@@ -16,7 +16,6 @@ class Minesweeper:
         self.renderer = MinesweeperRenderer(field_size) if use_render else None
         self.reset_game()
         self.scanner = MinesweeperScanner(self.field)
-        
 
     def reset_state(self):
         self.field = None
@@ -61,7 +60,6 @@ class Minesweeper:
             self.field = self.generator.generate_field(self.field_size, coords, self.mines_num, self.seed)
             self.scanner.field = self.field
             self.full_field = self.get_full_field()
-            print(self.full_field)
         if self.opened_field[coords] != -2:
             return
         cells_to_be_opened = [coords]
@@ -80,7 +78,6 @@ class Minesweeper:
         if self.opened_field[coords] != -2. and self.opened_field[coords] != -1.:
             return
         self.opened_field[coords] = -1. if self.opened_field[coords] == -2. else -2.
-        print(self.full_field)
         if self.player_field[coords] == 1. and self.field[coords] == 1.:
             self.placed_good_flags.add(coords)
         elif coords in self.placed_good_flags:
@@ -98,7 +95,6 @@ class Minesweeper:
             self._right_click_action(coords)
         self.check_game_end()
         self.utility_data = [{'Game lost': self.game_lost, 'Game won': self.game_won}]
-        self.human_render()
 
     def human_render(self):
         if self.renderer is None:
