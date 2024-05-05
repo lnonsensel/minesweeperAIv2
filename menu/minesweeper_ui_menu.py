@@ -3,10 +3,11 @@ from menu.elements import TkinterElements
 import typing as tp
 
 class MinesweeperUIMenu:
-    def __init__(self, tab_control, start_command: tp.Callable) -> None:
+    def __init__(self, tab_control, start_command: tp.Callable = lambda x: x) -> None:
         self.ui_preferences = MinesweeperGamePreferences()
         self.ui_elements = TkinterElements(tab_control, 'UI')
         self.start_command = start_command
+        self.use_ui = False
 
     def add_start_button(self, grid: tuple[int, int]):
         self.ui_elements.add_button(grid, 'Start UI', self.execute_start_command)
@@ -15,7 +16,7 @@ class MinesweeperUIMenu:
         self.use_seed_checker_ui_data = self.ui_elements.add_checker(grid, 'Use seed', 'Seed')
 
     def add_seed_spinbox(self, grid: tuple[int, int]):
-        self.seed_spinbox_ui_data = self.ui_elements.add_spinbox(grid, 'Seed', self.ui_preferences.seed, increment=1000)
+        self.seed_spinbox_ui_data = self.ui_elements.add_spinbox(grid, 'Seed', self.ui_preferences.seed, increment=1)
 
     def add_mines_num_spinbox(self, grid: tuple[int, int]):
         self.mines_num_spinbox_ui_data = self.ui_elements.add_spinbox(grid, 'Mines number', self.ui_preferences.mines_num, increment=10)
@@ -25,6 +26,7 @@ class MinesweeperUIMenu:
 
     def execute_start_command(self):
         self.update_preferences()
+        self.use_ui = True
         self.ui_elements.tab_control.quit()
         self.ui_elements.tab_control.destroy()
         self.start_command(self.ui_preferences)
@@ -46,6 +48,5 @@ class MinesweeperUIMenu:
                     self.add_field_size_spinbox,
                     self.add_use_seed_checker,
                     self.add_seed_spinbox,
-                    self.add_use_seed_checker,
                     self.add_start_button]
         self.ui_elements.pack_tab(elements)

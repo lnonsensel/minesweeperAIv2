@@ -33,7 +33,6 @@ class MinesweeperEnv(Minesweeper, gym.Env):
         self.play_action(action)
         # obs = np.asarray([self.opened_field])
         obs = self.opened_field
-        print(self.observation_space.shape)
         self.get_reward()
         self.render()
         self.step_ind += 1
@@ -102,8 +101,12 @@ gym.register(id='MinesweeperEnv-v1',
              entry_point='minesweeper_env.minenv:MinesweeperEnv',
              max_episode_steps=300)
 
-def get_minenv(preferences: MinesweeperEnvPreferences) -> MinesweeperEnv:
-    return gym.make('MinesweeperEnv-v1',
-                    **asdict(preferences))
-
+def get_minenv(preferences: MinesweeperEnvPreferences | dict) -> MinesweeperEnv:
+    if isinstance(preferences, MinesweeperEnvPreferences):
+        return gym.make('MinesweeperEnv-v1',
+                        **asdict(preferences.game_preferences),
+                        **asdict(preferences))
+    elif isinstance(preferences, dict):
+        return gym.make('MinesweeperEnv-v1',
+                        **preferences['game_preferences'], **preferences)
 

@@ -7,10 +7,9 @@ import numpy as np
 import os
 import time
 import datetime
-import gym
 import torch
 import matplotlib.pyplot as plt
-import random
+from teacher.preferences import TeacherPreferences
 
 class Teacher:
     def __init__(self,
@@ -20,9 +19,11 @@ class Teacher:
                  learning_max_steps: int,
                  model_filename: str) -> None:
         self.env_preferences = env_preferences
-        self.aget_preferences = agent_preferences
-        self.agent = get_agent(agent_preferences)
+        self.agent_preferences = agent_preferences
         self.env = get_minenv(env_preferences)
+        self.agent_preferences.action_dim = self.env.action_space.n
+        self.agent_preferences.state_dim = self.env.observation_space.shape
+        self.agent = get_agent(agent_preferences)
         self.top_eval_score = -float('inf')
         self.last_eval_scores = None
         self.last_eval_rewards = None
@@ -157,3 +158,12 @@ class Teacher:
                 os.remove(f'./evaluations/{self.last_saved_model_name}')
             self.last_saved_model_name = f'{self.start_time}_{self.agent.total_steps}_{round(self.max_reward, 2)}_{self.model_filename}'
             torch.save(self.agent.network.state_dict(), f'./evaluations/{self.last_saved_model_name}')
+
+
+def setup_teacher(teacher_kwargs: TeacherPreferences) -> Teacher:
+    
+    return Teacher(teacher_kwargs.agent_preferences,
+                   teacher_kwargs.env_preferences,
+                   teacher_kwargs.eval_interval,
+                   teacher_kwargs.learning_max_steps,
+                   teacher_kwargs.model_filename)

@@ -14,9 +14,11 @@ class CNN(nn.Module):
         return super().__call__(*args, **kwds)
     
     def forward(self, x) -> torch.Tensor:
+        # print(x.shape)
         print(x.shape)
         x = F.relu(self.conv1(x))
-        x = F.relu(self.flat1(x))
+        # x = F.relu(self.flat1(x))
+        x = x.view((-1, 45 * 10 * 10))
         x = F.relu(self.linear(x))
         return x
 

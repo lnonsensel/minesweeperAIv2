@@ -10,6 +10,7 @@ class MinesweeperGamePreferences:
 @dataclass
 class MinesweeperEnvPreferences:
     game_preferences: MinesweeperGamePreferences = MinesweeperGamePreferences()
+    use_render: bool = use_render
     render_modes: list[str] = render_modes
     render_mode: str = render_mode
     env_max_steps: int = env_max_steps

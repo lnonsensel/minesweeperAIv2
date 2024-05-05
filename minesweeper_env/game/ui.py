@@ -30,6 +30,8 @@ class MinesweeperUI(Minesweeper):
             if i.type == pg.QUIT:
                 self.quit()
 
+def setup_ui(ui_kwargs) -> MinesweeperUI:
+    return MinesweeperUI(**ui_kwargs)
 
 class MinesweeperEnvUI(MinesweeperEnv):
     def __init__(self,

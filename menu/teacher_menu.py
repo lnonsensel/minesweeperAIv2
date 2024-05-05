@@ -18,7 +18,7 @@ class TeacherMenu:
     def update_preferences(self):
         self.teacher_preferences.eval_interval = self.eval_interval_spinbox_data.variable.get()
         self.teacher_preferences.model_filename = self.model_filename_input_data.variable.get()
-        self.teacher_preferences.learning_max_steps = self.max_learning_steps_input.variable.get()
+        self.teacher_preferences.learning_max_steps = int(float(self.max_learning_steps_input.variable.get()))
 
     def add_teacher_to_window(self):
         elements = [self.add_eval_interval_spinbox,

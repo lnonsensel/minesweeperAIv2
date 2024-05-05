@@ -2,7 +2,7 @@ from minesweeper_env.preferences import MinesweeperEnvPreferences
 from menu.elements import TkinterElements
 import typing as tp
 class MinesweeperEnvMenu:
-    def __init__(self, tab_control, start_command: tp.Callable) -> None:
+    def __init__(self, tab_control, start_command: tp.Callable = lambda x: x) -> None:
         self.env_preferences = MinesweeperEnvPreferences()
         self.env_elements = TkinterElements(tab_control, 'Environment')
         self.start_command = start_command
@@ -43,7 +43,7 @@ class MinesweeperEnvMenu:
         else:
             self.render_mode_box_data.element['state'] = 'readonly'
         
-        if not self.use_render_checker_data.variable.get():
+        if not self.use_seed_checker_data.variable.get():
             self.seed_spinbox_data.element['state'] = 'disabled'
         else:
             self.seed_spinbox_data.element['state'] = 'normal'
@@ -53,8 +53,8 @@ class MinesweeperEnvMenu:
         field_size = (self.field_size_spinbox_data.variable.get(), self.field_size_spinbox_data.variable.get(),)
         self.env_preferences.game_preferences.field_size = field_size
         self.env_preferences.game_preferences.seed = self.seed_spinbox_data.variable.get() if self.use_seed_checker_data.variable.get() else None
-        self.env_preferences.game_preferences.use_render = self.use_render_checker_data.variable.get()
-        self.env_preferences.render_mode = self.render_mode_box_data.variable.get()
+        self.env_preferences.use_render = self.use_render_checker_data.variable.get()
+        self.env_preferences.render_mode = self.render_mode_box_data.element.get()
     
     def add_env_to_window(self):
         elements = [

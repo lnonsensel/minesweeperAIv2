@@ -64,7 +64,7 @@ class TkinterElements:
     def add_spinbox(self, grid, label_text, default_spin_value: int, increment: int) -> ElementData:
         self.add_label(label_text, grid)
         spin_var = IntVar(value=default_spin_value)
-        spin = Spinbox(self.window, from_=0, to=float('inf'), width=10, increment=increment, textvariable=spin_var)
+        spin = Spinbox(self.window, from_=0, to=float('inf'), width=20, increment=increment, textvariable=spin_var)
         # spin.grid(column=grid[0], row=grid[1] + 1)
         spin.pack()
         # self.tab_control.pack()
