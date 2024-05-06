@@ -3,6 +3,11 @@ from minesweeper_env.preferences import MinesweeperEnvPreferences
 from agent.preferences import AgentPreferences
 
 @dataclass
+class EvaluatorPreferences:
+    model_filename: str
+    env_preferences: str
+
+@dataclass
 class TeacherPreferences:
     env_preferences: MinesweeperEnvPreferences | None = None
     agent_preferences: AgentPreferences | None = None

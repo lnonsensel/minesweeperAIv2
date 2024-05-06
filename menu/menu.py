@@ -9,7 +9,7 @@ import typing as tp
 from teacher.preferences import TeacherPreferences
 from minesweeper_env.preferences import MinesweeperGamePreferences
 from dataclasses import dataclass
-
+from menu.evaluator_menu import EvaluatorMenu
 @dataclass
 class MenuFinalData:
     use_ui: bool # If False Teacher will be used
@@ -26,6 +26,7 @@ class MinesweeperAIMenu:
         self.ui_menu = MinesweeperUIMenu(self.tab_control)
         self.teacher_menu = TeacherMenu(self.tab_control)
         self.agent_menu = AgentMenu(self.tab_control)
+        self.eval_menu = EvaluatorMenu(self.tab_control)
         self.menu_data = MenuFinalData(False, TeacherPreferences(), MinesweeperGamePreferences())
 
     def init_menus(self):
@@ -33,6 +34,7 @@ class MinesweeperAIMenu:
         self.ui_menu.add_ui_to_window()
         self.teacher_menu.add_teacher_to_window()
         self.agent_menu.add_agent_to_menu()
+        self.eval_menu.add_eval_to_window()
         self.tab_control.pack()
 
     def update_menu_data(self):

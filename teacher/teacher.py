@@ -10,6 +10,7 @@ import datetime
 import torch
 import matplotlib.pyplot as plt
 from teacher.preferences import TeacherPreferences
+from teacher.config import MODELS_CHECKPOINTS_PATH
 
 class Teacher:
     def __init__(self,
@@ -69,7 +70,7 @@ class Teacher:
                 self.non_warmup_start_time = int(time.time())
             a = self.agent.act(s)
             s_prime, r, terminated, truncated, info = self.env.step(a)
-            result = self.agent.process((s, a, r, s_prime, terminated)) 
+            result = self.agent.process((s, a, r, s_prime, terminated))
             self.last_reward = r
 
             
@@ -99,6 +100,9 @@ class Teacher:
                 secs_left = 'Warmup ongoing'
             self.env.utility_data[0]['Seconds left'] = secs_left
             self.env.render()
+            if self.agent.total_steps % self.eval_interval == 0:
+                self.create_history_plot(history)
+                self.checkpoint_model()
             if self.agent.total_steps > self.learning_max_steps:
                 break
         self.create_history_plot(history)
@@ -155,9 +159,9 @@ class Teacher:
         if not self.is_warmup:
             if self.last_saved_model_name is not None:
                 print('removing...', self.last_saved_model_name)
-                os.remove(f'./evaluations/{self.last_saved_model_name}')
+                os.remove(f'{MODELS_CHECKPOINTS_PATH}/{self.last_saved_model_name}')
             self.last_saved_model_name = f'{self.start_time}_{self.agent.total_steps}_{round(self.max_reward, 2)}_{self.model_filename}'
-            torch.save(self.agent.network.state_dict(), f'./evaluations/{self.last_saved_model_name}')
+            torch.save(self.agent.network.state_dict(), f'{MODELS_CHECKPOINTS_PATH}/{self.last_saved_model_name}')
 
 
 def setup_teacher(teacher_kwargs: TeacherPreferences) -> Teacher:

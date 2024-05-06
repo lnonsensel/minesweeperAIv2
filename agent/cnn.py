@@ -8,14 +8,12 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
         self.conv1 = nn.Conv2d(1, 45, 3, 1, 1)
         self.flat1 = nn.Flatten()
-        self.linear = nn.Linear(400, action_space)
+        self.linear = nn.Linear(4500, action_space)
 
     def __call__(self, *args: tp.Any, **kwds: tp.Any) -> torch.Tensor:
         return super().__call__(*args, **kwds)
     
     def forward(self, x) -> torch.Tensor:
-        # print(x.shape)
-        print(x.shape)
         x = F.relu(self.conv1(x))
         # x = F.relu(self.flat1(x))
         x = x.view((-1, 45 * 10 * 10))

@@ -22,7 +22,7 @@ class TkinterElements:
         lbl.pack()
         # self.tab_control.pack()
 
-    def add_box(self, grid: tuple[int, int], label_name: str, values: str, default_value: str) -> ElementData:
+    def add_box(self, grid: tuple[int, int], label_name: str, values: list[str], default_value: str) -> ElementData:
         self.add_label(label_name, grid)
         combo = Combobox(self.window, state='readonly')
         combo['values']= values
