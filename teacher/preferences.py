@@ -4,13 +4,12 @@ from agent.preferences import AgentPreferences
 
 @dataclass
 class EvaluatorPreferences:
-    model_filename: str
-    env_preferences: str
+    model_filename: str = 'none'
 
 @dataclass
 class TeacherPreferences:
     env_preferences: MinesweeperEnvPreferences | None = None
     agent_preferences: AgentPreferences | None = None
     eval_interval: int = 10000
-    learning_max_steps: int = 1e6
+    learning_max_steps: int = 200000
     model_filename: str = 'dqn.pt'

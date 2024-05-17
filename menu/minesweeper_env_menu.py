@@ -6,6 +6,7 @@ class MinesweeperEnvMenu:
         self.env_preferences = MinesweeperEnvPreferences()
         self.env_elements = TkinterElements(tab_control, 'Environment')
         self.start_command = start_command
+        self.use_env = False
 
     def add_render_mode_box(self, grid: tuple[int, int]):
         self.render_mode_box_data = self.env_elements.add_box(grid, 'Render mode', self.env_preferences.render_modes, self.env_preferences.render_mode)
@@ -35,6 +36,7 @@ class MinesweeperEnvMenu:
         self.update_env()
         self.env_elements.tab_control.quit()
         self.env_elements.tab_control.destroy()
+        self.use_env = True
         self.start_command(self.env_preferences)
 
     def update_env(self):

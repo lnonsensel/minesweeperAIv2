@@ -4,9 +4,11 @@ from dataclasses import dataclass
 class AgentPreferences:
     state_dim: tuple[int, int] | int | None = None
     action_dim: int | None = None
-    lr: int=0.00025
+    # lr: int=0.00025
+    lr: int=0.001
     epsilon: int=1.0
-    epsilon_min: int=0.1
+    # epsilon_min: int=0.1
+    epsilon_min: int=0.
     gamma: int=0.99
     batch_size: int=32
     warmup_steps: int=5000

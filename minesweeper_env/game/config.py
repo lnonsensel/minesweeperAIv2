@@ -2,9 +2,9 @@
 # ENV PREFERENCES
 
 field_size = (10, 10)
-mines_num = 3
+mines_num = 15
 use_render = True
-seed = 8128376198273
+seed = 618297364
 render_mode = 'human'
 render_modes = ('info', 'human', 'none')
 max_steps = field_size[0] * field_size[1] // 2
@@ -19,9 +19,4 @@ env_kwargs = {'field_size': field_size,
 model_filename = 'dqn.pt'
 env_max_steps = 200
 
-# TRAINING PREFERENCES
 
-max_steps = int(1e6)
-eval_interval = 10000
-warmup_steps = 1000
-target_update_interval = 10000

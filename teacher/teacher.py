@@ -1,5 +1,5 @@
 from agent.dqn import DQN
-from minesweeper_env.minenv import get_minenv
+from minesweeper_env.minenv import get_minenv, LearningStepData
 from minesweeper_env.preferences import MinesweeperEnvPreferences
 from agent.preferences import AgentPreferences
 from agent.dqn import get_agent
@@ -11,6 +11,7 @@ import torch
 import matplotlib.pyplot as plt
 from teacher.preferences import TeacherPreferences
 from teacher.config import MODELS_CHECKPOINTS_PATH
+from dataclasses import dataclass, asdict
 
 class Teacher:
     def __init__(self,
@@ -36,6 +37,7 @@ class Teacher:
         self.eval_interval = eval_interval
         self.learning_max_steps = learning_max_steps
         self.model_filename = model_filename
+        self.last_action = None
 
     def evaluate(self, n_evals=5):
         eval_env = get_minenv(self.env_preferences)
@@ -69,14 +71,15 @@ class Teacher:
             if not self.is_warmup and self.non_warmup_start_time is None:
                 self.non_warmup_start_time = int(time.time())
             a = self.agent.act(s)
+            self.last_action = a
             s_prime, r, terminated, truncated, info = self.env.step(a)
             result = self.agent.process((s, a, r, s_prime, terminated))
             self.last_reward = r
-
             
             s = s_prime
             if terminated or truncated:
-                if self.max_reward < r:
+                print(self.max_reward, r, self.env.game_lost)
+                if self.max_reward < r and not self.is_warmup:
                     self.max_reward = r
                     self.checkpoint_model()
                 s, _ = self.env.reset()
@@ -86,23 +89,12 @@ class Teacher:
                 ret = self.evaluate()
                 history['Step'].append(self.agent.total_steps)
                 history['AvgReturn'].append(ret)
-            
-            # if self.env.render_mode in ['info', 'human']:
-            #     self.print_learning_data(10)
-            start_time = self.start_time
-            non_warmup_start_time = self.non_warmup_start_time
-            self.env.utility_data[0]['Round'] = f'{round(100 * (self.agent.total_steps / self.learning_max_steps), 2)}% | {self.agent.total_steps}/{self.learning_max_steps} | {int(time.time()) - start_time} seconds since start'
-            if non_warmup_start_time is not None:
-                avg_secs_step = (int(time.time()) - non_warmup_start_time) / self.agent.total_steps
-                secs_left = avg_secs_step * (self.learning_max_steps - self.agent.total_steps)
-                secs_left = str(datetime.timedelta(seconds=int(secs_left)))
-            else:
-                secs_left = 'Warmup ongoing'
-            self.env.utility_data[0]['Seconds left'] = secs_left
-            self.env.render()
-            if self.agent.total_steps % self.eval_interval == 0:
                 self.create_history_plot(history)
-                self.checkpoint_model()
+            if self.env.render_mode == 'info':
+                self.print_learning_data(5)
+            # self.env.render()
+            # if self.agent.total_steps % self.eval_interval == 0:
+                # self.checkpoint_model()
             if self.agent.total_steps > self.learning_max_steps:
                 break
         self.create_history_plot(history)
@@ -121,6 +113,9 @@ class Teacher:
         if self.agent.total_steps % update_rate != 0:
             return
         os.system('clear')
+        learning_data = self.get_data()
+        print(*[i for i in asdict(learning_data).values()], sep='\n')
+        print(self.last_action)
 
     def save_learning_data(self, update_rate = 1):
         if self.agent.total_steps % update_rate != 0:
@@ -146,14 +141,7 @@ class Teacher:
         warmup_status = f'Warmup: {self.is_warmup}'
         eval_scores = f'Last eval scores: {self.last_eval_scores}'
         top_eval_score = f'Top eval score: {self.top_eval_score}'
-        return [percentage,
-                steps_left,
-                timer,
-                time_left,
-                points,
-                warmup_status,
-                eval_scores,
-                top_eval_score]
+        return LearningStepData(percentage, steps_left, timer, time_left, points, warmup_status, eval_scores, top_eval_score)
 
     def checkpoint_model(self):
         if not self.is_warmup:

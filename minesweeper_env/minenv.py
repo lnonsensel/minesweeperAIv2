@@ -5,7 +5,18 @@ from minesweeper_env.game.minesweeper_game import Minesweeper
 import numpy as np
 import os
 from minesweeper_env.preferences import MinesweeperEnvPreferences
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
+
+@dataclass
+class LearningStepData:
+    percentage: str
+    steps_left: str
+    timer: str
+    time_left: str
+    points: str
+    warmup_status: str
+    eval_scores: str
+    top_eval_score: str
 
 class MinesweeperEnv(Minesweeper, gym.Env):
     metadata = {"render_modes": ["human", "info", "none"]}
@@ -31,7 +42,6 @@ class MinesweeperEnv(Minesweeper, gym.Env):
         self.previous_good_flags = self.placed_good_flags.copy()
         action = self.actions[action]
         self.play_action(action)
-        # obs = np.asarray([self.opened_field])
         obs = self.opened_field
         self.get_reward()
         self.render()
@@ -41,12 +51,12 @@ class MinesweeperEnv(Minesweeper, gym.Env):
     def reset(self, seed = None, options = None):
         self.previous_opened_field = None
         self.previous_player_field = None
+        self.game_lost = False
+        self.game_won = False
         self.reward = 0
         self.last_reward = 0
         self.step_ind = 0
         self.reset_game()
-        # obs = np.asarray([self.opened_field])
-        # return obs, {}
         return self.opened_field, {}
     
     def render(self):
@@ -56,12 +66,13 @@ class MinesweeperEnv(Minesweeper, gym.Env):
             self.utility_data[0]['Game won'] = self.game_won
             self.utility_data[0]['Game lost'] = self.game_lost
             self.human_render()
-        elif self.render_mode == 'info':
-            os.system('clear')
-            print(f'Steps: {self.step_ind} / {self.env_max_steps}')
-            print(f'Score: {self.reward}')
-            print(f'Game won: {self.game_won}')
-            print(f'Game lost: {self.game_lost}')
+        # elif self.render_mode == 'info':
+        #     os.system('clear')
+        #     print(f'Steps: {self.step_ind} / {self.env_max_steps}')
+        #     print(f'Score: {self.reward}')
+        #     print(f'Game won: {self.game_won}')
+        #     print(f'Game lost: {self.game_lost}')
+        #     # print(*[i for i in asdict(info).items()], sep = '\n')
         elif self.render_mode == 'none':
             pass
 
@@ -73,7 +84,7 @@ class MinesweeperEnv(Minesweeper, gym.Env):
     def get_reward(self):
         self.last_reward = self.reward
         if self.game_lost:
-            self.reward -= 5.
+            self.reward -= 0.
             return
         elif self.game_won:
             self.reward += 10.
