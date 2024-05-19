@@ -24,6 +24,7 @@ class Evaluator:
         s, _ = eval_env.reset()
         done = False
         s_prime, r, terminated, truncated, info = eval_env.step(random.randint(0, eval_env.action_space.n))
+        s = s_prime
         while True:
             eval_env.render()
             time.sleep(0.5)

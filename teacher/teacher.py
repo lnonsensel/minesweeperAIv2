@@ -38,6 +38,7 @@ class Teacher:
         self.learning_max_steps = learning_max_steps
         self.model_filename = model_filename
         self.last_action = None
+        self.evals_counter = 0
 
     def evaluate(self, n_evals=5):
         eval_env = get_minenv(self.env_preferences)
@@ -78,18 +79,20 @@ class Teacher:
             
             s = s_prime
             if terminated or truncated:
-                print(self.max_reward, r, self.env.game_lost)
-                if self.max_reward < r and not self.is_warmup:
-                    self.max_reward = r
+                # print(self.max_reward, r, self.env.game_lost)
+                if self.max_reward < info['score'] and not self.is_warmup:
+                    self.max_reward = info['score']
                     self.checkpoint_model()
                 s, _ = self.env.reset()
                 s, reward, terminated, truncated, info = self.env.step(self.env.action_space.sample())
                 
             if self.agent.total_steps % self.eval_interval == 0:
+                self.evals_counter += 1
                 ret = self.evaluate()
                 history['Step'].append(self.agent.total_steps)
                 history['AvgReturn'].append(ret)
-                self.create_history_plot(history)
+                if self.evals_counter % 10 == 0:
+                    self.create_history_plot(history)
             if self.env.render_mode == 'info':
                 self.print_learning_data(5)
             # self.env.render()
@@ -98,6 +101,7 @@ class Teacher:
             if self.agent.total_steps > self.learning_max_steps:
                 break
         self.create_history_plot(history)
+        self.checkpoint_model(remove_previous=False)
 
     def create_history_plot(self, history: dict[str, int]):
         plt.figure(figsize=(8, 5))
@@ -143,9 +147,9 @@ class Teacher:
         top_eval_score = f'Top eval score: {self.top_eval_score}'
         return LearningStepData(percentage, steps_left, timer, time_left, points, warmup_status, eval_scores, top_eval_score)
 
-    def checkpoint_model(self):
+    def checkpoint_model(self, remove_previous = True):
         if not self.is_warmup:
-            if self.last_saved_model_name is not None:
+            if self.last_saved_model_name is not None and remove_previous:
                 print('removing...', self.last_saved_model_name)
                 os.remove(f'{MODELS_CHECKPOINTS_PATH}/{self.last_saved_model_name}')
             self.last_saved_model_name = f'{self.start_time}_{self.agent.total_steps}_{round(self.max_reward, 2)}_{self.model_filename}'
