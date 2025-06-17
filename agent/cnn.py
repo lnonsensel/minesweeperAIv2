@@ -1,29 +1,49 @@
+import torch
 from torch import nn
 from torch.nn import functional as F
-import torch
 import numpy as np
 import typing as tp
-class CNN(nn.Module):
-    def __init__(self, action_space, *args, **kwargs) -> None:
-        super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 45, 3, 1, 1)
-        self.flat1 = nn.Flatten()
-        self.linear = nn.Linear(4500, action_space)
+from utils import log
 
-    def __call__(self, *args: tp.Any, **kwds: tp.Any) -> torch.Tensor:
-        return super().__call__(*args, **kwds)
+class MinesweeperAgent(nn.Module):
+    def __init__(self, window_size=5, feat_dim=32):
+        super().__init__()
+        self.window_size = window_size
+        self.in_channels = 3
+        self.padding = (window_size - 1) // 2
+
+        self.conv = nn.Conv2d(self.in_channels,
+                              feat_dim,
+                              kernel_size=window_size,
+                              padding=0)
+        
+        self.norm = nn.LayerNorm(feat_dim)
+        self.fc = nn.Linear(feat_dim, 2)
+    @log
+    def forward(self, x):
+        if not isinstance(x, torch.Tensor):
+            x = torch.tensor(x).to('cuda')
+        b,c,h,w = x.shape
+        unfolded = F.unfold(x,
+                            kernel_size=self.window_size,
+                            stride=1,
+                            padding=self.padding)
+        windows = unfolded.permute(0, 2, 1)
+        windows = unfolded.view(b*h*w, -1)
     
-    def forward(self, x) -> torch.Tensor:
-        x = F.relu(self.conv1(x))
-        # x = F.relu(self.flat1(x))
-        x = x.view((-1, 45 * 10 * 10))
-        x = F.relu(self.linear(x))
-        return x
+        windows = unfolded.view(b*h*w, c, self.window_size, self.window_size)
+        features = self.conv(windows)
 
-if __name__ == '__main__':
-    device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
-    x = torch.Tensor(np.zeros((1, 20, 20))).to(device)
-    cnn = CNN(20 * 20, 64)
-    cnn.to(device)
-    q = cnn(x)
-    print(q)
+        features = features.squeeze(-1).squeeze(-1)
+        features = self.norm(features)
+        features = F.relu(features)
+
+        actions = self.fc(features)
+
+        output = actions.view(b, h, w, 2)
+        output = output.permute(0, 3, 1, 2)
+        return output
+
+    
+    def __call__(self, *args, **kwds) -> torch.Tensor:
+        return super().__call__(*args, **kwds)

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from minesweeper_env.game.config import field_size, mines_num, use_render, seed, render_mode, env_max_steps, render_modes
 
 @dataclass
@@ -9,7 +9,7 @@ class MinesweeperGamePreferences:
 
 @dataclass
 class MinesweeperEnvPreferences:
-    game_preferences: MinesweeperGamePreferences = MinesweeperGamePreferences()
+    game_preferences: MinesweeperGamePreferences = field(default_factory=MinesweeperGamePreferences)
     use_render: bool = use_render
     render_modes: list[str] = render_modes
     render_mode: str = render_mode

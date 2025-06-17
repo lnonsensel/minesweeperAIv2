@@ -10,6 +10,7 @@ from teacher.preferences import TeacherPreferences, EvaluatorPreferences
 from minesweeper_env.preferences import MinesweeperGamePreferences, MinesweeperEnvPreferences
 from dataclasses import dataclass
 from menu.evaluator_menu import EvaluatorMenu
+
 @dataclass
 class MenuFinalData:
     use_ui: bool
@@ -71,10 +72,3 @@ class MinesweeperAIMenu:
         self.update()
         self.window.mainloop()
         self.update_menu_data()
-
-
-if __name__ == '__main__':
-    def f():
-        print('hello!')
-    menu = MinesweeperAIMenu(f)
-    menu.run()

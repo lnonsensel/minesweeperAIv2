@@ -1,12 +1,13 @@
 from teacher.config import MODELS_CHECKPOINTS_PATH
 import torch
-import gym
+import gymnasium as gym
 import random
 import os
 from agent.dqn import DQN
 from minesweeper_env.minenv import get_minenv, MinesweeperEnvPreferences
 from teacher.preferences import EvaluatorPreferences
 import time
+
 class Evaluator:
     def __init__(self, env_preferences: MinesweeperEnvPreferences, eval_preferences: EvaluatorPreferences) -> None:
         self.env: gym.Env = get_minenv(env_preferences)

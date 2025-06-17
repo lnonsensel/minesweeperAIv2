@@ -34,6 +34,9 @@ class MinesweeperScanner:
         return list(zero_open)
 
     def get_cell_value(self, cell_coords: tuple[int, int]) -> float:
+        '''
+        -3 value returned for mine field
+        '''
         if self.field[cell_coords[0]][cell_coords[1]] == 1.:
             return -3.
         cell_value = sum(self.field[neig] for neig in self.get_neighbours(cell_coords, self.field.shape))

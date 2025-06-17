@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 from teacher.preferences import TeacherPreferences
 from teacher.config import MODELS_CHECKPOINTS_PATH
 from dataclasses import dataclass, asdict
+import typing as tp
+from utils import log
 
 class Teacher:
     def __init__(self,
@@ -24,8 +26,10 @@ class Teacher:
         self.agent_preferences = agent_preferences
         self.env = get_minenv(env_preferences)
         self.agent_preferences.action_dim = self.env.action_space.n
-        self.agent_preferences.state_dim = self.env.observation_space.shape
+        field_size = self.env_preferences.game_preferences.field_size
+        self.agent_preferences.state_dim = field_size
         self.agent = get_agent(agent_preferences)
+        self.agent.action_dim = 2 * field_size[0] * field_size[1]
         self.top_eval_score = -float('inf')
         self.last_eval_scores = None
         self.last_eval_rewards = None
@@ -39,7 +43,7 @@ class Teacher:
         self.model_filename = model_filename
         self.last_action = None
         self.evals_counter = 0
-
+    @log
     def evaluate(self, n_evals=5):
         eval_env = get_minenv(self.env_preferences)
         scores = 0
@@ -47,44 +51,63 @@ class Teacher:
         rewards = []
         for _ in range(n_evals):
             s, _= eval_env.reset()
-            s, reward, terminated, truncated, info = eval_env.step(eval_env.action_space.sample())
+            # s, reward, terminated, truncated, info = eval_env.step(eval_env.action_space.sample())
+            episode_reward = 0
             while not done:
                 a = self.agent.act(s, training=False)
                 s, reward, terminated, truncated, info = eval_env.step(a)
-                rewards.append(reward)
+                episode_reward += reward
                 done = terminated or truncated
+            rewards.append(reward)
             self.top_eval_score = reward if reward > self.top_eval_score else self.top_eval_score
             scores += reward
         
         self.last_eval_scores = scores
         self.last_eval_rewards = rewards
         return np.round(scores / n_evals, 4)
+    
+    @log
+    def get_channels(field):
+        field_scanned = np.zeros(field.shape, np.float16)
+        opened_cells = np.ones(field.shape, dtype=np.float16)
+        flag_cells = np.zeros(field.shape, dtype=np.float16)
+        for y in range(field.shape[1]):
+            for x in range(field.shape[0]):
+                value = field[y][x]
+                field_scanned[y,x] = -1. if value == -3. else value
+                field_scanned[y,x] = 0. if value == -2. else value
+                flag_cells[y,x] = 1. if value == -1. else 0.
+                opened_cells[y,x] = 0. if value == -2. else 1.
 
+        channel_0 = field_scanned
+        channel_1 = opened_cells
+        channel_2 = flag_cells
+        return np.asarray([channel_0, channel_1, channel_2])
+    @log
     def train(self):
         history = {'Step': [], 'AvgReturn': []}
         (s, _) = self.env.reset()
-
-        s, reward, terminated, truncated, info = self.env.step(self.env.action_space.sample())
         self.start_time = int(time.time())
-        
         while True:
             self.is_warmup = self.agent.warmup_steps > self.agent.total_steps
             if not self.is_warmup and self.non_warmup_start_time is None:
                 self.non_warmup_start_time = int(time.time())
             a = self.agent.act(s)
+            if isinstance(a, tp.SupportsInt):
+                a=self.env.unwrapped.actions[a]
             self.last_action = a
             s_prime, r, terminated, truncated, info = self.env.step(a)
             result = self.agent.process((s, a, r, s_prime, terminated))
             self.last_reward = r
-            
+            print(result)
             s = s_prime
             if terminated or truncated:
-                # print(self.max_reward, r, self.env.game_lost)
                 if self.max_reward < info['score'] and not self.is_warmup:
                     self.max_reward = info['score']
                     self.checkpoint_model()
                 s, _ = self.env.reset()
-                s, reward, terminated, truncated, info = self.env.step(self.env.action_space.sample())
+            else:
+                s = s_prime
                 
             if self.agent.total_steps % self.eval_interval == 0:
                 self.evals_counter += 1
@@ -95,9 +118,6 @@ class Teacher:
                     self.create_history_plot(history)
             if self.env.render_mode == 'info':
                 self.print_learning_data(5)
-            # self.env.render()
-            # if self.agent.total_steps % self.eval_interval == 0:
-                # self.checkpoint_model()
             if self.agent.total_steps > self.learning_max_steps:
                 break
         self.create_history_plot(history)
@@ -127,7 +147,7 @@ class Teacher:
         with open('./temp_data/data.txt', 'w') as file:
             for i in self.get_data():
                 file.write(i)
-
+    @log
     def get_data(self):       
         start_time = self.start_time
         non_warmup_start_time = self.non_warmup_start_time
