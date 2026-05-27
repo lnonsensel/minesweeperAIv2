@@ -6,3 +6,6 @@ __pycache__/
 evaluations/*.png
 evaluations/*.csv
 .env
+CLAUDE.md
+.claude/
+graphify-out/
