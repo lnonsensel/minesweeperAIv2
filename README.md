@@ -10,9 +10,11 @@ Deep Q-Network (DQN) agent that learns to play Minesweeper.
 The agent uses a convolutional neural network to process the game board and outputs Q-values for every possible action (open cell or place flag) at every position. Training is driven by a custom Gymnasium environment with a dense reward function.
 
 **Architecture:**
-- CNN with sliding window feature extraction (5×5 kernel, unfold-based)
-- DQN with experience replay and a target network
-- Two output channels: click map and flag map
+- 3-layer fully-convolutional network (3×3 kernels, BatchNorm, 7×7 receptive field)
+- Double DQN with experience replay and soft target-network updates (τ=0.005)
+- Two output channels: click Q-map and flag Q-map
+
+For a full breakdown of every module, encoding scheme, and training loop see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Requirements
 
