@@ -6,19 +6,8 @@ from minesweeper_env.game.config import RewardConfig
 import numpy as np
 import os
 from minesweeper_env.preferences import MinesweeperEnvPreferences
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 import typing as tp
-
-@dataclass
-class LearningStepData:
-    percentage: str
-    steps_left: str
-    timer: str
-    time_left: str
-    points: str
-    warmup_status: str
-    eval_scores: str
-    top_eval_score: str
 
 class MinesweeperEnv(Minesweeper, gym.Env):
     metadata = {"render_modes": ["human", "info", "none"]}
@@ -79,11 +68,7 @@ class MinesweeperEnv(Minesweeper, gym.Env):
             self.utility_data[0]['Game lost'] = self.game_lost
             self.human_render()
         elif self.render_mode == 'info':
-            os.system('clear')
-            print(f'Steps: {self.step_ind} / {self.env_max_steps}')
-            print(f'Score: {self.reward}')
-            print(f'Game won: {self.game_won}')
-            print(f'Game lost: {self.game_lost}')
+            pass  # display is managed by Teacher.print_learning_data
         elif self.render_mode == 'none':
             pass
 

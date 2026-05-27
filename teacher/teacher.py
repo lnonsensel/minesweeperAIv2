@@ -1,6 +1,6 @@
 import csv
 from agent.dqn import DQN
-from minesweeper_env.minenv import get_minenv, LearningStepData
+from minesweeper_env.minenv import get_minenv
 from minesweeper_env.preferences import MinesweeperEnvPreferences
 from agent.preferences import AgentPreferences
 from agent.dqn import get_agent
@@ -12,7 +12,7 @@ import torch
 import matplotlib.pyplot as plt
 from teacher.preferences import TeacherPreferences
 from teacher.config import MODELS_CHECKPOINTS_PATH
-from dataclasses import dataclass, asdict
+from dataclasses import asdict
 import typing as tp
 from utils import log
 
@@ -47,6 +47,10 @@ class Teacher:
         self.last_action = None
         self.evals_counter = 0
         self.use_tensorboard = use_tensorboard
+        self.last_avg_return = 0.0
+        self.last_loss = 0.0
+        self.recent_eval_returns: list[float] = []
+        self._last_print_time: float = 0.0
 
         if resume_from:
             checkpoint = torch.load(f'{MODELS_CHECKPOINTS_PATH}/{resume_from}', weights_only=False)
@@ -102,12 +106,7 @@ class Teacher:
             result = self.agent.process((s, a, r, s_prime, terminated))
             self.last_reward = r
             if result:
-                if self.env.render_mode == 'info':
-                    print(
-                        f"step={result['total_steps']} "
-                        f"loss={result['value_loss']:.4f} "
-                        f"eps={self.agent.epsilon:.4f}"
-                    )
+                self.last_loss = result['value_loss']
                 if writer:
                     writer.add_scalar('train/loss', result['value_loss'], result['total_steps'])
                     writer.add_scalar('train/epsilon', self.agent.epsilon, result['total_steps'])
@@ -118,6 +117,8 @@ class Teacher:
             if self.agent.total_steps % self.eval_interval == 0:
                 self.evals_counter += 1
                 ret = self.evaluate()
+                self.last_avg_return = ret
+                self.recent_eval_returns.append(ret)
                 history['Step'].append(self.agent.total_steps)
                 history['AvgReturn'].append(ret)
                 if writer:
@@ -130,7 +131,7 @@ class Teacher:
                 if self.evals_counter % 10 == 0:
                     self.create_history_plot(history)
             if self.env.render_mode == 'info':
-                self.print_learning_data(5)
+                self.print_learning_data()
             if self.agent.total_steps > self.learning_max_steps:
                 break
         self.create_history_plot(history)
@@ -153,40 +154,58 @@ class Teacher:
             writer.writerow(['Step', 'AvgReturn'])
             writer.writerows(zip(history['Step'], history['AvgReturn']))
 
-    def print_learning_data(self, update_rate=1):
-        if self.agent.total_steps % update_rate != 0:
+    def print_learning_data(self):
+        now = time.time()
+        if now - self._last_print_time < 1.0:
             return
-        os.system('clear')
-        learning_data = self.get_data()
-        print(*[i for i in asdict(learning_data).values()], sep='\n')
-        print(self.last_action)
+        self._last_print_time = now
 
-    def save_learning_data(self, update_rate=1):
-        if self.agent.total_steps % update_rate != 0:
-            return
-        with open('./temp_data/data.txt', 'w') as file:
-            for i in self.get_data():
-                file.write(i)
+        steps = self.agent.total_steps
+        max_steps = self.learning_max_steps
+        pct = steps / max(max_steps, 1)
 
-    @log
-    def get_data(self):
-        start_time = self.start_time
-        non_warmup_start_time = self.non_warmup_start_time
-        if non_warmup_start_time is not None:
-            avg_secs_step = (int(time.time()) - non_warmup_start_time) / max(self.agent.total_steps, 1)
-            secs_left = avg_secs_step * (self.learning_max_steps - self.agent.total_steps)
-            secs_left = str(datetime.timedelta(seconds=int(secs_left)))
+        bar_len = 38
+        filled = int(bar_len * pct)
+        bar = '█' * filled + '░' * (bar_len - filled)
+
+        elapsed = int(now - self.start_time)
+        elapsed_str = str(datetime.timedelta(seconds=elapsed))
+        if self.non_warmup_start_time and steps > self.agent.warmup_steps:
+            secs_per_step = (now - self.non_warmup_start_time) / max(steps - self.agent.warmup_steps, 1)
+            eta_secs = max(0, int(secs_per_step * (max_steps - steps)))
+            eta_str = str(datetime.timedelta(seconds=eta_secs))
         else:
-            secs_left = 'Warmup ongoing'
-        percentage = f'{round(100 * (self.agent.total_steps / self.learning_max_steps), 2)}%'
-        steps_left = f'{self.agent.total_steps}/{self.learning_max_steps}'
-        timer = f'{int(time.time()) - start_time} seconds since start'
-        time_left = f'~Time left: {secs_left}'
-        points = f'Points: {self.last_reward}'
-        warmup_status = f'Warmup: {self.is_warmup}'
-        eval_scores = f'Last eval scores: {self.last_eval_scores}'
-        top_eval_score = f'Top eval score: {self.top_eval_score} | Win rate: {self.last_win_rate:.1%}'
-        return LearningStepData(percentage, steps_left, timer, time_left, points, warmup_status, eval_scores, top_eval_score)
+            eta_str = 'warming up...'
+
+        trend = ''
+        if len(self.recent_eval_returns) >= 2:
+            delta = self.recent_eval_returns[-1] - self.recent_eval_returns[-2]
+            trend = ' ↑' if delta > 0.5 else (' ↓' if delta < -0.5 else ' →')
+
+        W = 48
+        os.system('clear')
+        print('═' * W)
+        print('  MinesweeperAI — Training')
+        print('═' * W)
+        print(f'  [{bar}] {pct:.1%}')
+        print(f'  Step:      {steps:>8,} / {max_steps:,}')
+        print(f'  Elapsed:   {elapsed_str:<14}  ETA: {eta_str}')
+        print()
+        warmup_tag = '  [warmup]' if self.is_warmup else ''
+        print(f'  Epsilon:   {self.agent.epsilon:.4f}{warmup_tag}')
+        print(f'  Loss:      {self.last_loss:.4f}')
+        print(f'  Reward:    {self.last_reward}')
+        print()
+        print(f'  {"── Evaluations ──":-<{W - 4}}')
+        avg_str = f'{self.last_avg_return:.2f}' if self.recent_eval_returns else 'n/a'
+        best_str = f'{self.top_eval_score:.2f}' if self.top_eval_score > -1e9 else 'n/a'
+        print(f'  Avg return:  {avg_str}')
+        print(f'  Win rate:    {self.last_win_rate:.1%}')
+        print(f'  Best score:  {best_str}')
+        if self.recent_eval_returns:
+            history = '  '.join(f'{s:.1f}' for s in self.recent_eval_returns[-6:])
+            print(f'  History:     {history}{trend}')
+        print('═' * W)
 
     def checkpoint_model(self, remove_previous=True):
         if not self.is_warmup:
