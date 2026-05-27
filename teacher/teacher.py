@@ -22,7 +22,9 @@ class Teacher:
                  env_preferences: MinesweeperEnvPreferences,
                  eval_interval: int,
                  learning_max_steps: int,
-                 model_filename: str) -> None:
+                 model_filename: str,
+                 resume_from: str | None = None,
+                 use_tensorboard: bool = False) -> None:
         self.env_preferences = env_preferences
         self.agent_preferences = agent_preferences
         self.env = get_minenv(env_preferences)
@@ -44,6 +46,15 @@ class Teacher:
         self.model_filename = model_filename
         self.last_action = None
         self.evals_counter = 0
+        self.use_tensorboard = use_tensorboard
+
+        if resume_from:
+            checkpoint = torch.load(f'{MODELS_CHECKPOINTS_PATH}/{resume_from}', weights_only=False)
+            self.agent.network.load_state_dict(checkpoint['network'])
+            self.agent.optimizer.load_state_dict(checkpoint['optimizer'])
+            self.agent.total_steps = checkpoint['total_steps']
+            self.agent.epsilon = checkpoint['epsilon']
+            self.top_eval_score = checkpoint['top_eval_score']
 
     @log
     def evaluate(self, n_evals=5):
@@ -75,6 +86,10 @@ class Teacher:
         history = {'Step': [], 'AvgReturn': []}
         (s, _) = self.env.reset()
         self.start_time = int(time.time())
+        writer = None
+        if self.use_tensorboard:
+            from torch.utils.tensorboard import SummaryWriter
+            writer = SummaryWriter(f'runs/{self.start_time}')
         while True:
             self.is_warmup = self.agent.warmup_steps > self.agent.total_steps
             if not self.is_warmup and self.non_warmup_start_time is None:
@@ -86,12 +101,16 @@ class Teacher:
             s_prime, r, terminated, truncated, info = self.env.step(a)
             result = self.agent.process((s, a, r, s_prime, terminated))
             self.last_reward = r
-            if result and self.env.render_mode == 'info':
-                print(
-                    f"step={result['total_steps']} "
-                    f"loss={result['value_loss']:.4f} "
-                    f"eps={self.agent.epsilon:.4f}"
-                )
+            if result:
+                if self.env.render_mode == 'info':
+                    print(
+                        f"step={result['total_steps']} "
+                        f"loss={result['value_loss']:.4f} "
+                        f"eps={self.agent.epsilon:.4f}"
+                    )
+                if writer:
+                    writer.add_scalar('train/loss', result['value_loss'], result['total_steps'])
+                    writer.add_scalar('train/epsilon', self.agent.epsilon, result['total_steps'])
             s = s_prime
             if terminated or truncated:
                 s, _ = self.env.reset()
@@ -101,6 +120,9 @@ class Teacher:
                 ret = self.evaluate()
                 history['Step'].append(self.agent.total_steps)
                 history['AvgReturn'].append(ret)
+                if writer:
+                    writer.add_scalar('eval/avg_return', ret, self.agent.total_steps)
+                    writer.add_scalar('eval/win_rate', self.last_win_rate, self.agent.total_steps)
                 if ret > self.top_eval_score:
                     self.top_eval_score = ret
                     if not self.is_warmup:
@@ -113,6 +135,8 @@ class Teacher:
                 break
         self.create_history_plot(history)
         self.checkpoint_model(remove_previous=False)
+        if writer:
+            writer.close()
 
     def create_history_plot(self, history: dict[str, list]):
         plt.figure(figsize=(8, 5))
@@ -188,4 +212,6 @@ def setup_teacher(teacher_kwargs: TeacherPreferences) -> Teacher:
                    teacher_kwargs.env_preferences,
                    teacher_kwargs.eval_interval,
                    teacher_kwargs.learning_max_steps,
-                   teacher_kwargs.model_filename)
+                   teacher_kwargs.model_filename,
+                   teacher_kwargs.resume_from,
+                   teacher_kwargs.use_tensorboard)

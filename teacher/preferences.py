@@ -13,3 +13,5 @@ class TeacherPreferences:
     eval_interval: int = 10000
     learning_max_steps: int = 200000
     model_filename: str = 'dqn.pt'
+    resume_from: str | None = None
+    use_tensorboard: bool = False

@@ -1,6 +1,6 @@
 import torch
 from agent.cnn import MinesweeperAgent
-from agent.replaybuffer import ReplayBuffer
+from agent.replaybuffer import PrioritizedReplayBuffer
 from agent.preferences import AgentPreferences
 from dataclasses import asdict
 import numpy as np
@@ -37,7 +37,8 @@ class DQN:
         self.target_network = MinesweeperAgent()
         self.target_network.load_state_dict(self.network.state_dict())
         self.optimizer = torch.optim.RMSprop(self.network.parameters(), lr)
-        self.buffer = ReplayBuffer(state_dim, (1,), buffer_size)
+        self.buffer = PrioritizedReplayBuffer(state_dim, (1,), buffer_size,
+                                              beta_steps=epsilon_decay_steps)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.network.to(self.device)
         self.target_network.to(self.device)
@@ -67,7 +68,11 @@ class DQN:
 
     @log
     def learn(self):
-        s, a, r, s_prime, terminated = map(lambda x: x.to(self.device), self.buffer.sample(self.batch_size))
+        batch = self.buffer.sample(self.batch_size)
+        s, a, r, s_prime, terminated = [x.to(self.device) for x in batch[:5]]
+        weights = batch[5].to(self.device)
+        leaf_indices = batch[6]
+
         s_channels = self.get_batch_channels(s)
         s_prime_channels = self.get_batch_channels(s_prime)
 
@@ -81,9 +86,13 @@ class DQN:
         td_target = r.squeeze() + (1 - terminated.squeeze()) * self.gamma * next_q_max
 
         current_q = self.network(s_channels).reshape(self.batch_size, -1)
-        selected_q = current_q.gather(1, a.long())  # a is (B, 1) flat index
+        selected_q = current_q.gather(1, a.long())  # (B, 1)
 
-        loss = F.mse_loss(selected_q, td_target.unsqueeze(1))
+        td_errors = (td_target.unsqueeze(1) - selected_q).detach().abs().reshape(-1).cpu().numpy()
+        self.buffer.update_priorities(leaf_indices, td_errors)
+
+        # IS-weighted MSE loss
+        loss = (weights.unsqueeze(1) * F.mse_loss(selected_q, td_target.unsqueeze(1), reduction='none')).mean()
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.network.parameters(), 10.0)
@@ -124,11 +133,6 @@ class DQN:
 
     @log
     def get_channels(self, field: torch.Tensor):
-        """
-        Channel 0 — visible cell values
-        Channel 1 — cell is opened (1) or closed (0)
-        Channel 2 — cell has a flag (1) or not (0)
-        """
         channel0 = torch.where(
             field == -3, -1.0,
             torch.where(field == -2, 0.0, field)

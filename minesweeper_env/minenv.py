@@ -55,7 +55,10 @@ class MinesweeperEnv(Minesweeper, gym.Env):
         self.get_reward()
         self.render()
         self.step_ind += 1
-        return obs, self.reward - self.last_reward, self.game_lost or self.game_won, self.step_ind > self.env_max_steps, {'score': self.reward}
+        step_reward = self.reward - self.last_reward
+        if self.rc.reward_clip > 0.0:
+            step_reward = float(np.clip(step_reward, -self.rc.reward_clip, self.rc.reward_clip))
+        return obs, step_reward, self.game_lost or self.game_won, self.step_ind > self.env_max_steps, {'score': self.reward}
 
     def reset(self, seed = None, options = None):
         self.previous_opened_field = None

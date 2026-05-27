@@ -39,3 +39,4 @@ class RewardConfig:
     new_cell_factor: float = 0.4
     correct_flag_factor: float = 0.2
     win_min: float = 20.0
+    reward_clip: float = 0.0  # 0 = disabled; positive value clips step reward to [-clip, +clip]

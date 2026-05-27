@@ -5,7 +5,7 @@ from minesweeper_env.game.generator import MinesweeperGenerator
 from minesweeper_env.game.scanner import MinesweeperScanner
 from minesweeper_env.game.minesweeper_game import Minesweeper
 from agent.dqn import DQN
-from agent.replaybuffer import ReplayBuffer
+from agent.replaybuffer import ReplayBuffer, SumTree, PrioritizedReplayBuffer
 
 
 class TestGenerator:
@@ -200,10 +200,12 @@ class TestReplayBuffer:
         for _ in range(20):
             s = np.zeros((9, 9), dtype=np.float32)
             self.buf.update(s, np.array([0]), 1.0, s, False)
-        states, actions, rewards, next_states, dones = self.buf.sample(4)
+        states, actions, rewards, next_states, dones, weights, indices = self.buf.sample(4)
         assert states.shape == (4, 9, 9)
         assert actions.shape == (4, 1)
         assert rewards.shape == (4, 1)
+        assert weights.shape == (4,)
+        assert len(indices) == 4
 
     def test_circular_overflow(self):
         for i in range(150):
@@ -211,6 +213,88 @@ class TestReplayBuffer:
             self.buf.update(s, np.array([0]), float(i), s, False)
         assert self.buf.size == 100  # capped at max_size
         assert self.buf.ptr == 50    # wrapped around
+
+
+class TestSumTree:
+    def setup_method(self):
+        self.tree = SumTree(8)
+
+    def test_total_starts_zero(self):
+        assert self.tree.total == 0.0
+
+    def test_single_update(self):
+        leaf_idx = self.tree.capacity - 1  # first leaf
+        self.tree.update(leaf_idx, 5.0)
+        assert self.tree.total == pytest.approx(5.0)
+
+    def test_multiple_updates_sum(self):
+        for i in range(4):
+            self.tree.update(self.tree.capacity - 1 + i, float(i + 1))
+        assert self.tree.total == pytest.approx(1 + 2 + 3 + 4)
+
+    def test_get_returns_leaf(self):
+        for i in range(4):
+            self.tree.update(self.tree.capacity - 1 + i, 1.0)
+        idx = self.tree.get(0.5)
+        assert idx >= self.tree.capacity - 1
+
+    def test_overwrite_updates_total(self):
+        leaf_idx = self.tree.capacity - 1
+        self.tree.update(leaf_idx, 10.0)
+        self.tree.update(leaf_idx, 3.0)
+        assert self.tree.total == pytest.approx(3.0)
+
+
+class TestPrioritizedReplayBuffer:
+    def setup_method(self):
+        self.buf = PrioritizedReplayBuffer((9, 9), (1,), max_size=100)
+
+    def test_update_increments_size(self):
+        s = np.zeros((9, 9), dtype=np.float32)
+        self.buf.update(s, np.array([40]), 1.0, s, False)
+        assert self.buf.size == 1
+
+    def test_sample_shapes(self):
+        for _ in range(20):
+            s = np.zeros((9, 9), dtype=np.float32)
+            self.buf.update(s, np.array([0]), 1.0, s, False)
+        states, actions, rewards, next_states, dones, weights, leaf_indices = self.buf.sample(4)
+        assert states.shape == (4, 9, 9)
+        assert actions.shape == (4, 1)
+        assert weights.shape == (4,)
+        assert len(leaf_indices) == 4
+
+    def test_weights_in_range(self):
+        for _ in range(20):
+            s = np.zeros((9, 9), dtype=np.float32)
+            self.buf.update(s, np.array([0]), 1.0, s, False)
+        _, _, _, _, _, weights, _ = self.buf.sample(4)
+        assert (weights > 0).all()
+        assert (weights <= 1.0 + 1e-6).all()  # normalized to max=1
+
+    def test_update_priorities(self):
+        for _ in range(10):
+            s = np.zeros((9, 9), dtype=np.float32)
+            self.buf.update(s, np.array([0]), 1.0, s, False)
+        _, _, _, _, _, _, leaf_indices = self.buf.sample(4)
+        td_errors = np.array([0.5, 1.0, 2.0, 0.1])
+        self.buf.update_priorities(leaf_indices, td_errors)
+        assert self.buf.max_priority > 0
+
+    def test_beta_anneals(self):
+        initial_beta = self.buf.beta
+        for _ in range(10):
+            s = np.zeros((9, 9), dtype=np.float32)
+            self.buf.update(s, np.array([0]), 1.0, s, False)
+        self.buf.sample(4)
+        assert self.buf.beta > initial_beta
+
+    def test_circular_overflow(self):
+        for i in range(150):
+            s = np.full((9, 9), float(i), dtype=np.float32)
+            self.buf.update(s, np.array([0]), float(i), s, False)
+        assert self.buf.size == 100
+        assert self.buf.ptr == 50
 
 
 class TestRewardConfig:
@@ -233,3 +317,33 @@ class TestRewardConfig:
         rc = RewardConfig()
         assert rc.win_min > 0
         assert rc.win_min < rc.win_base
+
+    def test_reward_clip_default_disabled(self):
+        from minesweeper_env.game.config import RewardConfig
+        rc = RewardConfig()
+        assert rc.reward_clip == 0.0
+
+    def test_reward_clip_custom(self):
+        from minesweeper_env.game.config import RewardConfig
+        rc = RewardConfig(reward_clip=10.0)
+        assert rc.reward_clip == 10.0
+
+
+class TestDuelingDQN:
+    def setup_method(self):
+        from agent.cnn import MinesweeperAgent
+        self.model = MinesweeperAgent()
+
+    def test_output_shape(self):
+        x = torch.zeros(2, 3, 9, 9)
+        out = self.model(x)
+        assert out.shape == (2, 2, 9, 9)
+
+    def test_value_advantage_decomposition(self):
+        # All-same input → advantages should sum to near zero per cell
+        x = torch.zeros(1, 3, 9, 9)
+        out = self.model(x)
+        # output = V + A - mean(A); if all A are equal mean(A) = A, so output ≈ V everywhere
+        assert out.shape == (1, 2, 9, 9)
+        # no NaN or inf
+        assert torch.isfinite(out).all()
