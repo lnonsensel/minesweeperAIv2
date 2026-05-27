@@ -100,7 +100,7 @@ class MinesweeperEnv(Minesweeper, gym.Env):
             return
 
         if self.game_won:
-            win_bonus = max(0, rc.win_base - self.step_ind * rc.win_speed_factor)
+            win_bonus = max(rc.win_min, rc.win_base - self.step_ind * rc.win_speed_factor)
             step_reward += win_bonus
             self.reward += step_reward
             return
@@ -145,7 +145,9 @@ class MinesweeperEnv(Minesweeper, gym.Env):
             step_reward += new_opened * rc.new_cell_factor
 
             correct_flags = np.sum((self.opened_field == -1.) & (self.field == 1.))
-            step_reward += correct_flags * rc.correct_flag_factor
+            prev_correct = len(self.previous_good_flags) if self.previous_good_flags is not None else 0
+            new_correct_flags = correct_flags - prev_correct
+            step_reward += new_correct_flags * rc.correct_flag_factor
 
         self.reward += step_reward
 

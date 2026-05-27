@@ -38,3 +38,4 @@ class RewardConfig:
     wrong_flag_penalty: float = -4.0
     new_cell_factor: float = 0.4
     correct_flag_factor: float = 0.2
+    win_min: float = 20.0

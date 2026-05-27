@@ -24,10 +24,13 @@
 
 - [x] **Векторизация `get_batch_channels`** — заменён Python-цикл на батчевые тензорные операции
 - [x] **Gradient clipping** — добавлен `torch.nn.utils.clip_grad_norm_` перед `optimizer.step()`
-- [ ] **Double DQN** — текущий DQN переоценивает Q-значения; использовать основную сеть для выбора действия, целевую — для оценки
-- [ ] **Dueling DQN** — разделить выходной слой на `Value` и `Advantage` потоки для более стабильного обучения
-- [ ] **Prioritized Experience Replay (PER)** — семплировать переходы пропорционально TD-ошибке вместо равномерной выборки
-- [ ] **Более глубокая CNN** — текущая архитектура (1 свёртка → LayerNorm → FC) слишком проста; добавить 2–3 свёрточных слоя с residual connections
+- [x] **Double DQN** — online-сеть выбирает действие, target-сеть оценивает значение
+- [x] **Soft target update** — `τ=0.005` каждый шаг вместо hard copy каждые 10k шагов
+- [x] **Более глубокая CNN** — 3 Conv2d(3→32→64→64) + BatchNorm + ReLU + Conv1x1, receptive field 7×7
+- [x] **Правильный flat-индекс в `learn()`** — action (type, y, x) конвертируется в позицию в Q-векторе
+- [x] **Epsilon decay** — достигает `epsilon_min` за 150k шагов (75% бюджета)
+- [ ] **Dueling DQN** — разделить выходной слой на `Value` и `Advantage` потоки
+- [ ] **Prioritized Experience Replay (PER)** — семплировать переходы пропорционально TD-ошибке
 
 ---
 

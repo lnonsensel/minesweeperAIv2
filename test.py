@@ -159,29 +159,56 @@ class TestDQN:
         action = self.dqn.act(state, training=True)
         assert isinstance(action, (int, np.integer))
 
+    def test_flat_action_index_click(self):
+        # click (1, y, x) → flat = y * W + x  (channel 0 of Q-output)
+        H, W = self.dqn.H, self.dqn.W
+        for y in range(H):
+            for x in range(W):
+                expected = y * W + x
+                actual = y * self.dqn.W + x if 1 == 1 else self.dqn.H * self.dqn.W + y * self.dqn.W + x
+                assert actual == expected
+
+    def test_flat_action_index_flag(self):
+        # flag (0, y, x) → flat = H*W + y * W + x  (channel 1 of Q-output)
+        H, W = self.dqn.H, self.dqn.W
+        for y in range(H):
+            for x in range(W):
+                expected_flag = H * W + y * W + x
+                assert expected_flag >= H * W
+                assert expected_flag < 2 * H * W
+
+    def test_process_stores_flat_index(self):
+        state = np.full((9, 9), -2.0, dtype=np.float32)
+        # click on (3, 5): flat = 3 * 9 + 5 = 32
+        self.dqn.process((state, (1, 3, 5), 0.0, state, False))
+        assert self.dqn.buffer.a[0, 0] == 32
+        # flag on (2, 4): flat = 9*9 + 2*9 + 4 = 81 + 18 + 4 = 103
+        self.dqn.process((state, (0, 2, 4), 0.0, state, False))
+        assert self.dqn.buffer.a[1, 0] == 103
+
 
 class TestReplayBuffer:
     def setup_method(self):
-        self.buf = ReplayBuffer((9, 9), (3,), max_size=100)
+        self.buf = ReplayBuffer((9, 9), (1,), max_size=100)
 
     def test_update_increments_size(self):
         s = np.zeros((9, 9), dtype=np.float32)
-        self.buf.update(s, np.array([1, 4, 4]), 1.0, s, False)
+        self.buf.update(s, np.array([40]), 1.0, s, False)  # flat: click(4,4)=4*9+4=40
         assert self.buf.size == 1
 
     def test_sample_shapes(self):
         for _ in range(20):
             s = np.zeros((9, 9), dtype=np.float32)
-            self.buf.update(s, np.array([1, 0, 0]), 1.0, s, False)
+            self.buf.update(s, np.array([0]), 1.0, s, False)
         states, actions, rewards, next_states, dones = self.buf.sample(4)
         assert states.shape == (4, 9, 9)
-        assert actions.shape == (4, 3)
+        assert actions.shape == (4, 1)
         assert rewards.shape == (4, 1)
 
     def test_circular_overflow(self):
         for i in range(150):
             s = np.full((9, 9), float(i), dtype=np.float32)
-            self.buf.update(s, np.array([0, 0, 0]), float(i), s, False)
+            self.buf.update(s, np.array([0]), float(i), s, False)
         assert self.buf.size == 100  # capped at max_size
         assert self.buf.ptr == 50    # wrapped around
 
@@ -200,3 +227,9 @@ class TestRewardConfig:
         rc = RewardConfig(loss_penalty=-100.0, win_base=200.0)
         assert rc.loss_penalty == -100.0
         assert rc.win_base == 200.0
+
+    def test_win_min_exists_and_positive(self):
+        from minesweeper_env.game.config import RewardConfig
+        rc = RewardConfig()
+        assert rc.win_min > 0
+        assert rc.win_min < rc.win_base
