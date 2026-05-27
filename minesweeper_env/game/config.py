@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 
 # ENV PREFERENCES
 
@@ -20,3 +21,20 @@ model_filename = 'dqn.pt'
 env_max_steps = 200
 
 
+@dataclass
+class RewardConfig:
+    loss_penalty: float = -50.0
+    win_base: float = 100.0
+    win_speed_factor: float = 0.5
+    step_penalty: float = -0.3
+    repeat_click_penalty: float = -2.0
+    safe_cell_reward: float = 1.5
+    neighbor_info_factor: float = 0.8
+    open_neighbor_reward: float = 0.3
+    surround_bonus: float = 2.0
+    surround_threshold: int = 4
+    correct_flag_reward: float = 5.0
+    mine_cluster_factor: float = 0.7
+    wrong_flag_penalty: float = -4.0
+    new_cell_factor: float = 0.4
+    correct_flag_factor: float = 0.2

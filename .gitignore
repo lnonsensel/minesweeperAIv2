@@ -1,6 +1,8 @@
 .venv/
+venv/
 __pycache__/
 .vscode/
-venv/
-.venv/
 *.pt
+evaluations/*.png
+evaluations/*.csv
+.env

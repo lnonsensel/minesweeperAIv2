@@ -26,6 +26,8 @@ class Minesweeper:
         self.game_won = False
         self.last_opened_cell_value = None
         self.last_opened_coords = None
+        self.last_action_type = None
+        self.last_action_coords = None
         self.utility_data = [{'Game lost': self.game_lost, 'Game won': self.game_won}]
         self.full_field = None
     
@@ -42,7 +44,7 @@ class Minesweeper:
         self.human_render()
 
     def generate_fields(self, start_cell, seed: int | None = None):
-        self.field = self.generator.generate_field((self.field_size, self.field_size),
+        self.field = self.generator.generate_field(self.field_size,
                                                    start_cell,
                                                    self.mines_num,
                                                    self.seed)
@@ -78,7 +80,7 @@ class Minesweeper:
         if self.opened_field[coords] != -2. and self.opened_field[coords] != -1.:
             return
         self.opened_field[coords] = -1. if self.opened_field[coords] == -2. else -2.
-        if self.player_field[coords] == 1. and self.field[coords] == 1.:
+        if self.opened_field[coords] == -1. and self.field[coords] == 1.:
             self.placed_good_flags.add(coords)
         elif coords in self.placed_good_flags:
             self.placed_good_flags.remove(coords)
@@ -86,9 +88,11 @@ class Minesweeper:
     def play_action(self, action: tuple[int, int, int]):
         if self.game_lost or self.game_won:
             return
-        is_left_click = action[0]
+        is_left_click = bool(action[0])
         coords = (action[1], action[2])
         self.last_opened_coords = coords
+        self.last_action_type = action[0]
+        self.last_action_coords = coords
         if is_left_click:
             self._left_click_action(coords)
         else:

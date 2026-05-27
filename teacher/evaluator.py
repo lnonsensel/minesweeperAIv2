@@ -15,7 +15,9 @@ class Evaluator:
 
     def get_loaded_agent(self):
         dqn = DQN(self.env.observation_space.shape, self.env.action_space.n)
-        dqn.network.load_state_dict(torch.load(f'{MODELS_CHECKPOINTS_PATH}/{self.model_filename}'))
+        data = torch.load(f'{MODELS_CHECKPOINTS_PATH}/{self.model_filename}', weights_only=False)
+        state_dict = data['network'] if isinstance(data, dict) and 'network' in data else data
+        dqn.network.load_state_dict(state_dict)
         return dqn
 
     def collect_eval_frames(self):
@@ -24,7 +26,7 @@ class Evaluator:
         scores = 0
         s, _ = eval_env.reset()
         done = False
-        s_prime, r, terminated, truncated, info = eval_env.step(random.randint(0, eval_env.action_space.n))
+        s_prime, r, terminated, truncated, info = eval_env.step(random.randint(0, eval_env.action_space.n - 1))
         s = s_prime
         while True:
             eval_env.render()

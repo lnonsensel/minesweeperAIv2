@@ -28,9 +28,6 @@ class MinesweeperAgent(nn.Module):
                             kernel_size=self.window_size,
                             stride=1,
                             padding=self.padding)
-        windows = unfolded.permute(0, 2, 1)
-        windows = unfolded.view(b*h*w, -1)
-    
         windows = unfolded.view(b*h*w, c, self.window_size, self.window_size)
         features = self.conv(windows)
 

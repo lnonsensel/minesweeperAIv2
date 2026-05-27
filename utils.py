@@ -1,11 +1,10 @@
 import typing as tp
 import time
 import inspect
+import os
 import numpy as np
 
-
-
-USE_LOGGER = False
+USE_LOGGER = os.getenv('MINESWEEPER_DEBUG', '').lower() in ('1', 'true', 'yes')
 total = {}
 def log(func: tp.Callable):
     def wrapper(*args, **kwargs):
