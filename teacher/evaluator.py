@@ -14,7 +14,7 @@ class Evaluator:
         self.model_filename = eval_preferences.model_filename
 
     def get_loaded_agent(self):
-        dqn = DQN(self.env.observation_space.shape, self.env.action_space.n)
+        dqn = DQN(self.env.observation_space.shape[1:], self.env.action_space.n)
         data = torch.load(f'{MODELS_CHECKPOINTS_PATH}/{self.model_filename}', weights_only=False)
         state_dict = data['network'] if isinstance(data, dict) and 'network' in data else data
         dqn.network.load_state_dict(state_dict)

@@ -52,12 +52,22 @@ class DQN:
         x = self.preprocess(x)
         self.network.train(training)
         if training and ((np.random.rand() < self.epsilon) or (self.total_steps < self.warmup_steps)):
-            a = np.random.randint(0, self.action_dim)
+            field_flat = x.reshape(-1).cpu().numpy()
+            HW = self.H * self.W
+            click_valid = np.where(field_flat == -2)[0]
+            all_closed = len(click_valid) == HW
+            flag_valid = (
+                np.array([], dtype=np.int64)
+                if all_closed
+                else np.where(field_flat == -2)[0] + HW
+            )
+            valid_indices = np.concatenate([click_valid, flag_valid])
+            a = int(np.random.choice(valid_indices)) if len(valid_indices) > 0 else np.random.randint(0, self.action_dim)
         else:
-            x = self.get_channels(x)
-            x = x.float().unsqueeze(0).to(self.device)
-            q = self.network(x)
-            a = self.get_action_from_response(q)
+            x_channels = self.get_channels(x)
+            x_input = x_channels.float().unsqueeze(0).to(self.device)
+            q = self.network(x_input)
+            a = self.get_action_from_response(q, field=x)
         return a
 
     @log
@@ -148,15 +158,27 @@ class DQN:
         return (argmax // w, argmax % w)
 
     @log
-    def get_action_from_response(self, response):
-        response = response[0]
-        max_arg_click = self.get_max_index(response[0])
-        max_arg_flag = self.get_max_index(response[1])
-
-        use_click = torch.max(response[0]).item() >= torch.max(response[1]).item()
-        max_arg = max_arg_click if use_click else max_arg_flag
-        action = (int(use_click), *max_arg)
-        return action
+    def get_action_from_response(self, response, field=None):
+        q = response[0]  # (2, H, W)
+        if field is not None:
+            field_2d = field.squeeze(0) if field.dim() == 3 else field
+            q = q.clone()
+            q[0][field_2d != -2] = float('-inf')
+            q[1][field_2d != -2] = float('-inf')
+            if torch.all(field_2d == -2).item():
+                q[1][:] = float('-inf')  # первый ход — только клик
+            click_all_inf = torch.all(torch.isinf(q[0])).item()
+            flag_all_inf = torch.all(torch.isinf(q[1])).item()
+            if click_all_inf and flag_all_inf:
+                q = response[0]  # fallback: терминальное состояние
+            elif click_all_inf:
+                return (0, *self.get_max_index(q[1]))
+            elif flag_all_inf:
+                return (1, *self.get_max_index(q[0]))
+        max_arg_click = self.get_max_index(q[0])
+        max_arg_flag = self.get_max_index(q[1])
+        use_click = torch.max(q[0]).item() >= torch.max(q[1]).item()
+        return (int(use_click), *(max_arg_click if use_click else max_arg_flag))
 
 
 def get_agent(agent_preferences: AgentPreferences):

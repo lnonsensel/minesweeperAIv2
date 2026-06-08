@@ -6,18 +6,20 @@ field_size = (10, 10)
 mines_num = 15
 use_render = True
 seed = 618297364
-render_mode = 'human'
-render_modes = ('info', 'human', 'none')
+render_mode = "human"
+render_modes = ("info", "human", "none")
 max_steps = field_size[0] * field_size[1] // 2
-env_kwargs = {'field_size': field_size,
-              'mines_num': mines_num,
-              'use_render': use_render,
-              'seed': seed,
-              'render_mode': render_mode,
-              'max_steps': max_steps}
+env_kwargs = {
+    "field_size": field_size,
+    "mines_num": mines_num,
+    "use_render": use_render,
+    "seed": seed,
+    "render_mode": render_mode,
+    "max_steps": max_steps,
+}
 
 
-model_filename = 'dqn.pt'
+model_filename = "dqn.pt"
 env_max_steps = 200
 
 
@@ -27,7 +29,7 @@ class RewardConfig:
     win_base: float = 100.0
     win_speed_factor: float = 0.5
     step_penalty: float = -0.3
-    repeat_click_penalty: float = -2.0
+    repeat_click_penalty: float = -5.0
     safe_cell_reward: float = 1.5
     neighbor_info_factor: float = 0.8
     open_neighbor_reward: float = 0.3
@@ -39,4 +41,6 @@ class RewardConfig:
     new_cell_factor: float = 0.4
     correct_flag_factor: float = 0.2
     win_min: float = 20.0
-    reward_clip: float = 0.0  # 0 = disabled; positive value clips step reward to [-clip, +clip]
+    reward_clip: float = (
+        5.0  # 0 = disabled; positive value clips step reward to [-clip, +clip]
+    )

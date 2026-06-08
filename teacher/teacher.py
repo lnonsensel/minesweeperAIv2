@@ -176,7 +176,8 @@ class Teacher:
         max_steps = self.learning_max_steps
         pct = steps / max(max_steps, 1)
 
-        bar_len = 38
+        W = 56
+        bar_len = W - 10
         filled = int(bar_len * pct)
         bar = "█" * filled + "░" * (bar_len - filled)
 
@@ -196,29 +197,56 @@ class Teacher:
             delta = self.recent_eval_returns[-1] - self.recent_eval_returns[-2]
             trend = " ↑" if delta > 0.5 else (" ↓" if delta < -0.5 else " →")
 
-        W = 48
         os.system("clear")
         print("═" * W)
-        print("  Training")
+        print("  Training Dashboard")
         print("═" * W)
         print(f"  [{bar}] {pct:.1%}")
-        print(f"  Step:      {steps:>8,} / {max_steps:,}")
-        print(f"  Elapsed:   {elapsed_str:<14}  ETA: {eta_str}")
+        print(f"  Step:     {steps:>9,} / {max_steps:,}")
+        print(f"  Elapsed:  {elapsed_str:<14}  ETA: {eta_str}")
         print()
         warmup_tag = "  [warmup]" if self.is_warmup else ""
-        print(f"  Epsilon:   {self.agent.epsilon:.4f}{warmup_tag}")
-        print(f"  Loss:      {self.last_loss:.4f}")
-        print(f"  Reward:    {self.last_reward}")
+        print(f"  Epsilon:  {self.agent.epsilon:.4f}{warmup_tag}")
+        print(f"  Loss:     {self.last_loss:.6f}")
+        print(f"  Reward:   {self.last_reward}")
         print()
-        print(f"  {'── Evaluations ──':-<{W - 4}}")
-        avg_str = f"{self.last_avg_return:.2f}" if self.recent_eval_returns else "n/a"
-        best_str = f"{self.top_eval_score:.2f}" if self.top_eval_score > -1e9 else "n/a"
-        print(f"  Avg return:  {avg_str}")
+        n_evals = self.evals_counter
+        print(f"  ── Evaluations #{n_evals} " + "─" * (W - 22) )
+        avg_str = f"{self.last_avg_return:.4f}" if self.recent_eval_returns else "n/a"
+        best_str = f"{self.top_eval_score:.4f}" if self.top_eval_score > -1e9 else "n/a"
+        print(f"  Avg return:  {avg_str}{trend}")
         print(f"  Win rate:    {self.last_win_rate:.1%}")
         print(f"  Best score:  {best_str}")
+        if self.last_saved_model_name:
+            name = self.last_saved_model_name
+            if len(name) > W - 12:
+                name = "…" + name[-(W - 13):]
+            print(f"  Saved:    {name}")
         if self.recent_eval_returns:
-            history = "  ".join(f"{s:.1f}" for s in self.recent_eval_returns[-6:])
-            print(f"  History:     {history}{trend}")
+            n_show = min(len(self.recent_eval_returns), 10)
+            history_slice = self.recent_eval_returns[-n_show:]
+            print()
+            print(f"  ── Return History (last {n_show}) " + "─" * max(0, W - 30))
+            all_vals = [v for v in history_slice if v > 0]
+            scale = max(all_vals) if all_vals else 1.0
+            scale = max(scale, 0.01)
+            bar_w = 18
+            start_idx = n_evals - n_show + 1
+            for i, val in enumerate(history_slice):
+                eval_num = start_idx + i
+                filled_b = int(bar_w * max(val, 0) / scale)
+                mini_bar = "█" * filled_b + "░" * (bar_w - filled_b)
+                marker = " ◄" if i == n_show - 1 else "  "
+                print(f"  #{eval_num:<4} {val:>7.2f}  {mini_bar}{marker}")
+        gp = self.env_preferences.game_preferences
+        ap = self.agent_preferences
+        print()
+        print(f"  ── Hyperparameters " + "─" * (W - 21))
+        print(f"  Field: {gp.field_size[0]}×{gp.field_size[1]}   Mines: {gp.mines_num}   Steps/ep: {self.env_preferences.env_max_steps}")
+        print(f"  LR: {ap.lr:.5f}   γ: {ap.gamma:.3f}   τ: {ap.tau:.4f}   Batch: {ap.batch_size}")
+        print(f"  ε: {ap.epsilon:.2f} → {ap.epsilon_min:.3f}  over {ap.epsilon_decay_steps:,} steps")
+        print(f"  Buffer: {ap.buffer_size:,}   Warmup: {ap.warmup_steps:,}")
+        print(f"  Eval Δ: {self.eval_interval:,}   Total: {self.learning_max_steps:,}")
         print("═" * W)
 
     def checkpoint_model(self, remove_previous=True):
